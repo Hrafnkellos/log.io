@@ -10,13 +10,62 @@ import {
 } from './types'
 
 const openAsync = promisify(fs.open)
-const readAsync = promisify(fs.read)
+const readAsync: any = promisify(fs.read)
 const statAsync = promisify(fs.stat)
 
 const fds: {[filePath: string]: number} = {}
 
 /**
- * Reads new lines from file on disk and sends them to the server
+ * Core implementation that reads new lines from disk and writes them to the server.
+ * If `collectMetrics` is true the function will return message and byte counts,
+ * otherwise it returns null to avoid extra work on the hot path.
+ */
+async function doSendNewMessages(
+  client: Socket,
+  streamName: string,
+  sourceName: string,
+  filePath: string,
+  newSize: number,
+  oldSize: number,
+  collectMetrics = false,
+): Promise<{ messages: number; bytes: number } | null> {
+  let fd = fds[filePath]
+  if (!fd) {
+    fd = await openAsync(filePath, 'r')
+    fds[filePath] = fd
+  }
+  const offset = Math.max(newSize - oldSize, 0)
+
+  if (!Number.isFinite(offset) || offset <= 0) {
+    return null // skip invalid or empty reads
+  }
+
+  const readBuffer: Buffer = Buffer.alloc(offset)
+  await readAsync(fd, readBuffer, 0, offset, oldSize)
+  const asString = readBuffer.toString()
+  const messages = asString.split('\r\n').filter((msg) => !!msg.trim())
+
+  if (!collectMetrics) {
+    // Hot path: avoid computing bytes or counting unnecessarily
+    for (let i = 0; i < messages.length; i += 1) {
+      const payload = `+msg|${streamName}|${sourceName}|${messages[i]}\0`
+      client.write(payload)
+    }
+    return null
+  }
+
+  // Metrics path: compute bytes and return counts
+  let bytesSent = 0
+  messages.forEach((message) => {
+    const payload = `+msg|${streamName}|${sourceName}|${message}\0`
+    bytesSent += Buffer.byteLength(payload, 'utf8')
+    client.write(payload)
+  })
+  return { messages: messages.length, bytes: bytesSent }
+}
+
+/**
+ * Original fast function preserved for compatibility: behaves exactly like before (no metrics/logging).
  */
 async function sendNewMessages(
   client: Socket,
@@ -26,19 +75,32 @@ async function sendNewMessages(
   newSize: number,
   oldSize: number,
 ): Promise<void> {
-  let fd = fds[filePath]
-  if (!fd) {
-    fd = await openAsync(filePath, 'r')
-    fds[filePath] = fd
-  }
-  const offset = Math.max(newSize - oldSize, 0)
-  const readBuffer = Buffer.alloc(offset)
-  await readAsync(fd, readBuffer, 0, offset, oldSize)
-  const messages = readBuffer.toString().split('\r\n').filter((msg) => !!msg.trim())
-  messages.forEach((message) => {
-    client.write(`+msg|${streamName}|${sourceName}|${message}\0`)
-  })
+  await doSendNewMessages(client, streamName, sourceName, filePath, newSize, oldSize, false)
 }
+
+/**
+ * Wrapper that records metrics and then calls the core implementation.
+ */
+async function sendNewMessagesWithMetrics(
+  client: Socket,
+  streamName: string,
+  sourceName: string,
+  filePath: string,
+  newSize: number,
+  oldSize: number,
+): Promise<void> {
+  const start = process.hrtime.bigint()
+  const result = await doSendNewMessages(client, streamName, sourceName, filePath, newSize, oldSize, true)
+  if (result) {
+    const durationNs = Number(process.hrtime.bigint() - start)
+    // Basic metric logging - adjust or replace with a metrics client as needed
+    // eslint-disable-next-line no-console
+    console.log(`[metrics][sendNewMessages] file=${filePath} messages=${result.messages} bytes=${result.bytes} duration_ns=${durationNs}`)
+  }
+}
+
+// Export for benches/tests
+export { sendNewMessagesWithMetrics }
 
 /**
  * Sends an input registration to server
@@ -61,7 +123,7 @@ async function startFileWatcher(
   watcherOptions: WatcherOptions,
 ): Promise<void> {
   const fileSizes: FileSizeMap = {}
-  const watcher = chokidar.watch(inputPath, watcherOptions)
+  const watcher: any = chokidar.watch(inputPath, watcherOptions)
   // Capture byte size of a new file
   watcher.on('add', async (filePath: string) => {
     // eslint-disable-next-line no-console

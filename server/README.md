@@ -53,6 +53,10 @@ Begin sending log messages to the server via:
 
 There are two servers: the message server, which receives TCP messages from message inputs, and the HTTP server, which receives requests from browsers.  By default, the application looks for configuration in `~/.log.io/server.json`, and can be overridden with the environment variable `LOGIO_SERVER_CONFIG_PATH`.
 
+```sh
+export LOGIO_FILE_INPUT_CONFIG_PATH="/home/hrafnkell/git/log.io/inputs/file.json"
+```
+
 Sample configuration file:
 
 ```json

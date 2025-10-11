@@ -7,7 +7,6 @@ Powered by [node.js](http://nodejs.org) + [socket.io](http://socket.io)
 [![Version](https://img.shields.io/badge/node-%3E%3D%2012-brightgreen)](https://nodejs.org/)
 [![Node](https://img.shields.io/npm/v/log.io)](https://www.npmjs.com/package/log.io)
 
-
 ## How does it work?
 
 A **file input** watches log files for changes, sends new messages to the **server** via TCP, which broadcasts to **browsers** via socket.io.
@@ -28,19 +27,19 @@ While originally designed to represent backend service logs spread across multip
 
 Install via npm
 
-```
+```sh
 npm install -g log.io
 ```
 
 Configure hosts & ports (see example below)
 
-```
+```sh
 nano ~/.log.io/server.json
 ```
 
 Run server
 
-```
+```sh
 log.io-server
 ```
 
@@ -50,19 +49,19 @@ Browse to http://localhost:6688
 
 Install via npm
 
-```
+```sh
 npm install -g log.io-file-input
 ```
 
 Configure file input (see example below)
 
-```
+```sh
 nano ~/.log.io/inputs/file.json
 ```
 
 Run file input
 
-```
+```sh
 log.io-file-input
 ```
 
@@ -96,6 +95,10 @@ Sample configuration file:
 ## File input configuration
 
 Inputs are created by associating file paths with stream and source names in a configuration file.  By default, the file input looks for configuration in `~/.log.io/inputs/file.json`, and can be overridden with the environment variable `LOGIO_FILE_INPUT_CONFIG_PATH`.
+
+```sh
+export LOGIO_FILE_INPUT_CONFIG_PATH="/home/hrafnkell/git/log.io/inputs/file.json"
+```
 
 Input paths can be a file path, directory path or a [glob](https://en.wikipedia.org/wiki/Glob_(programming)).  Additionally, watcher options can be provided for more fine-grained control over file watching mechanics and performance. See the [chokidar](https://github.com/paulmillr/chokidar) documentation for more information.
 
@@ -131,14 +134,13 @@ Sample configuration file:
 
 ```
 
-
 ## Server TCP interface
 
 The file input connects to the server via TCP, and writes properly formatted strings to the socket.  Custom inputs can send messages to the server using the following commands, each of which ends with a null character:
 
 Send a log message
 
-```
+```sh
 +msg|streamName1|sourceName1|this is log message\0
 ```
 

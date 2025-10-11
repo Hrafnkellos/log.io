@@ -3,7 +3,7 @@ import os from 'os'
 import path from 'path'
 import { Socket } from 'net'
 import { promisify } from 'util'
-import { sendNewMessagesWithMetrics } from '../src/input'
+import { sendNewMessagesWithMetrics, sendNewMessages } from '../src/input'
 
 const writeFile = promisify(fs.writeFile)
 const appendFile = promisify(fs.appendFile)
@@ -32,7 +32,14 @@ async function bench() {
   const linesPerAppend = 1000
   const line = 'This is a sample log line for benchmarking purposes.'
 
-  const filePath = await makeTempFile('')
+  // Allow targeting a specific file for a live test via CLI or env var
+  // Usage: BENCH_TARGET_FILE=/path/to/file npm run bench
+  const targetFile = process.env.BENCH_TARGET_FILE || (() => {
+    const idx = process.argv.indexOf('--file')
+    return idx >= 0 && process.argv.length > idx + 1 ? process.argv[idx + 1] : undefined
+  })()
+
+  const filePath = targetFile || (await makeTempFile(''))
   let oldSize = 0
 
   const iterations = 10
@@ -42,9 +49,16 @@ async function bench() {
 
   for (let i = 0; i < iterations; i += 1) {
     const chunk = Array(linesPerAppend).fill(line).join('\r\n') + '\r\n'
+    // In live-target mode we append to the provided file, otherwise append to temp file
     await appendFile(filePath, chunk, { encoding: 'utf8' })
     const newSize = (await stat(filePath)).size
-    await sendNewMessagesWithMetrics(client as unknown as Socket, stream, source, filePath, newSize, oldSize)
+    if (targetFile) {
+      // Live test: use the fast path (no metrics) to avoid extra overhead
+      await sendNewMessages(client as unknown as Socket, stream, source, filePath, newSize, oldSize)
+    } else {
+      // Default synthetic bench: measure with metrics
+      await sendNewMessagesWithMetrics(client as unknown as Socket, stream, source, filePath, newSize, oldSize)
+    }
     oldSize = newSize
     // accumulate
     const writtenBytes = client.written.reduce((acc, b) => acc + b.length, 0)

@@ -1,4 +1,4 @@
-Log.io - File Input
+# Log.io - File Input
 ===================
 
 Powered by [node.js](http://nodejs.org) + [socket.io](http://socket.io)
@@ -25,19 +25,19 @@ While originally designed to represent backend service logs spread across multip
 
 Install via npm
 
-```
+```sh
 npm install -g log.io-file-input
 ```
 
 Configure file input (see example below)
 
-```
+```sh
 nano ~/.log.io/inputs/file.json
 ```
 
 Run file input
 
-```
+```sh
 log.io-file-input
 ```
 
@@ -85,18 +85,20 @@ The file input connects to the server via TCP, and writes properly formatted str
 
 Send a log message
 
-```
+```sh
 +msg|streamName1|sourceName1|this is log message\0
 ```
 
 Register a new input
 
-```
+```sh
 +input|streamName1|sourceName1\0
 ```
 
 Remove an existing input
 
-```
+```sh
 -input|streamName1|sourceName1\0
 ```
+
+npm run bench -- --file "/home/hrafnkell/git/log.io/inputs/demo.log"

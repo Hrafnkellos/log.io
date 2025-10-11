@@ -100,7 +100,7 @@ async function sendNewMessagesWithMetrics(
 }
 
 // Export for benches/tests
-export { sendNewMessagesWithMetrics }
+export { sendNewMessages, sendNewMessagesWithMetrics }
 
 /**
  * Sends an input registration to server

@@ -1,0 +1,14 @@
+node_modules
+lib
+lib/**
+dist
+coverage
+*.log
+*.tgz
+.vscode
+.git
+.gitignore
+npm-debug.log
+Dockerfile
+bench
+bench/**

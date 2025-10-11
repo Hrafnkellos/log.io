@@ -102,3 +102,52 @@ Remove an existing input
 ```
 
 npm run bench -- --file "/home/hrafnkell/git/log.io/inputs/demo.log"
+
+## Docker
+
+This package includes a `Dockerfile` (multi-stage) to build and run the file input as a container.
+
+Build the image:
+
+```sh
+cd inputs/file
+docker build -t logio-file-input:local .
+```
+
+Run the container (mount a config file):
+
+```sh
+docker run --rm -e LOGIO_FILE_INPUT_CONFIG_PATH=/config/file.json -v /host/config:/config logio-file-input:local
+```
+
+Short command (mount the repository `inputs/file.json` into the container):
+
+```sh
+# from `inputs/file` directory
+docker run --rm -it \
+  -v "$(pwd)/../file.json:/config/file.json:ro" \
+  -e LOGIO_FILE_INPUT_CONFIG_PATH=/config/file.json \
+  logio-file-input:local
+```
+
+Run detached (background) and view logs:
+
+```sh
+# run detached and name the container
+docker run -d --name logio-file-input \
+  -v "$(pwd)/../file.json:/config/file.json:ro" \
+  -e LOGIO_FILE_INPUT_CONFIG_PATH=/config/file.json \
+  logio-file-input:local
+
+# view logs
+docker logs -f logio-file-input
+
+# stop
+docker stop logio-file-input
+```
+
+Notes:
+
+- The builder stage installs devDependencies and runs the project build. The runtime stage copies the build artifacts and production dependencies from the builder to keep the image small.
+
+- If your host doesn't have Docker or the Docker daemon isn't running, the build will fail locally. In that case build the project locally with `npm run build` and run `node lib/index.js`.

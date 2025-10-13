@@ -1,6 +1,7 @@
 import { BindingActions } from '../reducers/bindings/types'
 import { ScreenActions } from '../reducers/screens/types'
 import { ActionTypes, State } from '../reducers/types'
+import { Socket } from 'socket.io-client'
 
 export type UrlBindingStateType = {
   [screenId: string]: Array<string>
@@ -10,7 +11,7 @@ export type UrlBindingStateType = {
  * Update URL hash with binding state
  */
 const urlMiddleware = (
-  socket: SocketIOClient.Socket,
+  socket: Socket,
   state: State,
   action: ActionTypes
 ): void => {

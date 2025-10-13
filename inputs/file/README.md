@@ -1,4 +1,5 @@
 # Log.io - File Input
+
 ===================
 
 Powered by [node.js](http://nodejs.org) + [socket.io](http://socket.io)
@@ -44,6 +45,10 @@ log.io-file-input
 ## File input configuration
 
 Inputs are created by associating file paths with stream and source names in a configuration file.  By default, the file input looks for configuration in `~/.log.io/inputs/file.json`, and can be overridden with the environment variable `LOGIO_FILE_INPUT_CONFIG_PATH`.
+
+```sh
+export LOGIO_FILE_INPUT_CONFIG_PATH="/home/hrafnkell/git/log.io/inputs/file.json"
+```
 
 Input paths can be a file path, directory path or a [glob](https://en.wikipedia.org/wiki/Glob_(programming)).  Additionally, watcher options can be provided for more fine-grained control over file watching mechanics and performance. See the [chokidar](https://github.com/paulmillr/chokidar) documentation for more information.
 
@@ -101,7 +106,9 @@ Remove an existing input
 -input|streamName1|sourceName1\0
 ```
 
+```sh
 npm run bench -- --file "/home/hrafnkell/git/log.io/inputs/demo.log"
+```
 
 ## Docker
 

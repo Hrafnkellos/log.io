@@ -1,4 +1,5 @@
 import chokidar from 'chokidar'
+import Tail from 'tail'
 import fs from 'fs'
 import { Socket } from 'net'
 import { promisify } from 'util'
@@ -10,62 +11,13 @@ import {
 } from './types'
 
 const openAsync = promisify(fs.open)
-const readAsync: any = promisify(fs.read)
+const readAsync = promisify(fs.read)
 const statAsync = promisify(fs.stat)
 
 const fds: {[filePath: string]: number} = {}
 
 /**
- * Core implementation that reads new lines from disk and writes them to the server.
- * If `collectMetrics` is true the function will return message and byte counts,
- * otherwise it returns null to avoid extra work on the hot path.
- */
-async function doSendNewMessages(
-  client: Socket,
-  streamName: string,
-  sourceName: string,
-  filePath: string,
-  newSize: number,
-  oldSize: number,
-  collectMetrics = false,
-): Promise<{ messages: number; bytes: number } | null> {
-  let fd = fds[filePath]
-  if (!fd) {
-    fd = await openAsync(filePath, 'r')
-    fds[filePath] = fd
-  }
-  const offset = Math.max(newSize - oldSize, 0)
-
-  if (!Number.isFinite(offset) || offset <= 0) {
-    return null // skip invalid or empty reads
-  }
-
-  const readBuffer: Buffer = Buffer.alloc(offset)
-  await readAsync(fd, readBuffer, 0, offset, oldSize)
-  const asString = readBuffer.toString()
-  const messages = asString.split('\r\n').filter((msg) => !!msg.trim())
-
-  if (!collectMetrics) {
-    // Hot path: avoid computing bytes or counting unnecessarily
-    for (let i = 0; i < messages.length; i += 1) {
-      const payload = `+msg|${streamName}|${sourceName}|${messages[i]}\0`
-      client.write(payload)
-    }
-    return null
-  }
-
-  // Metrics path: compute bytes and return counts
-  let bytesSent = 0
-  messages.forEach((message) => {
-    const payload = `+msg|${streamName}|${sourceName}|${message}\0`
-    bytesSent += Buffer.byteLength(payload, 'utf8')
-    client.write(payload)
-  })
-  return { messages: messages.length, bytes: bytesSent }
-}
-
-/**
- * Original fast function preserved for compatibility: behaves exactly like before (no metrics/logging).
+ * Reads new lines from file on disk and sends them to the server
  */
 async function sendNewMessages(
   client: Socket,
@@ -75,32 +27,21 @@ async function sendNewMessages(
   newSize: number,
   oldSize: number,
 ): Promise<void> {
-  await doSendNewMessages(client, streamName, sourceName, filePath, newSize, oldSize, false)
-}
-
-/**
- * Wrapper that records metrics and then calls the core implementation.
- */
-async function sendNewMessagesWithMetrics(
-  client: Socket,
-  streamName: string,
-  sourceName: string,
-  filePath: string,
-  newSize: number,
-  oldSize: number,
-): Promise<void> {
-  const start = process.hrtime.bigint()
-  const result = await doSendNewMessages(client, streamName, sourceName, filePath, newSize, oldSize, true)
-  if (result) {
-    const durationNs = Number(process.hrtime.bigint() - start)
-    // Basic metric logging - adjust or replace with a metrics client as needed
-    // eslint-disable-next-line no-console
-    console.log(`[metrics][sendNewMessages] file=${filePath} messages=${result.messages} bytes=${result.bytes} duration_ns=${durationNs}`)
+  let fd = fds[filePath]
+  if (!fd) {
+    fd = await openAsync(filePath, 'r')
+    fds[filePath] = fd
   }
+  const offset = Math.max(newSize - oldSize, 0)
+  const readBuffer: any = Buffer.alloc(offset)
+  await readAsync(fd, readBuffer, 0, offset, oldSize)
+  const messages = readBuffer.toString().split('\r\n').filter((msg:any) => !!msg.trim())
+  messages.forEach((message:any) => {
+    client.write(`+msg|${streamName}|${sourceName}|${message}\0`)
+  })
 }
 
-// Export for benches/tests
-export { sendNewMessages, sendNewMessagesWithMetrics }
+export { sendNewMessages }
 
 /**
  * Sends an input registration to server
@@ -122,38 +63,65 @@ async function startFileWatcher(
   inputPath: string,
   watcherOptions: WatcherOptions,
 ): Promise<void> {
-  const fileSizes: FileSizeMap = {}
-  const watcher: any = chokidar.watch(inputPath, watcherOptions)
-  // Capture byte size of a new file
-  watcher.on('add', async (filePath: string) => {
-    // eslint-disable-next-line no-console
-    console.log(`[${streamName}][${sourceName}] Watching: ${filePath}`)
-    fileSizes[filePath] = (await statAsync(filePath)).size
-  })
-  // Send new lines when a file is changed
-  watcher.on('change', async (filePath: string) => {
-    try {
-      const newSize = (await statAsync(filePath)).size
-      await sendNewMessages(
-        client,
-        streamName,
-        sourceName,
-        filePath,
-        newSize,
-        fileSizes[filePath],
-      )
-      fileSizes[filePath] = newSize
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(err)
+
+  var options= {
+    separator: /[\r]{0,1}\n/, 
+    fromBeginning: false, 
+    fsWatchOptions: watcherOptions, 
+    follow: true, 
+    logger: console
+  }
+
+  const watcher = chokidar.watch(inputPath, watcherOptions)
+  const tails = new Map();
+
+  watcher
+    .on("add", (filePath) => {
+      console.log(`[${streamName}][${sourceName}] Watching: ${filePath}`)
+
+      console.log(`New log file detected: ${filePath}`);
+      const tail = new Tail.Tail(filePath, {
+        useWatchFile: true,
+        follow: true,
+        fromBeginning: false,
+      });
+
+      tail.on("line", (line) => {
+        console.log(`[${filePath}] ${line}`)
+        client.write(`+msg|${streamName}|${sourceName}|${line}\0`)
+      });
+
+      tail.on("error", (err) => console.error(`[${filePath}] error:`, err));
+
+      tails.set(filePath, tail);
+    })
+    .on("unlink", (filePath) => {
+      console.log(`File removed: ${filePath}`);
+      const tail = tails.get(filePath);
+      if (tail) {
+        tail.unwatch();
+        tails.delete(filePath);
+      }
+    });
+
+    function stopAllTails() {
+      console.log("Stopping all tails...");
+      for (const tail of tails.values()) tail.unwatch();
     }
-  })
-  // If a file is removed (or moved), delete its file descriptor & size
-  watcher.on('unlink', (filePath: string) => {
-    delete fileSizes[filePath]
-    delete fds[filePath]
-  })
+
+    process.on("SIGINT", () => {
+      console.log("\nCaught SIGINT (Ctrl+C). Cleaning up...");
+      stopAllTails();
+      process.exit(0);
+    });
+
+    process.on("SIGTERM", () => {
+      console.log("\nCaught SIGTERM (system shutdown). Cleaning up...");
+      stopAllTails();
+      process.exit(0);
+    });
 }
+
 
 /**
  * Async sleep helper

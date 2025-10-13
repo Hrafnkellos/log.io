@@ -2,13 +2,14 @@ import { BindingActions } from '../reducers/bindings/types'
 import { ScreenActions } from '../reducers/screens/types'
 import { ActionTypes, State } from '../reducers/types'
 import { sendBindInput, sendUnbindInput } from '../socket'
+import { Socket } from 'socket.io-client'
 
 /**
  * Sends bind/unbind events to the server based on reducer actions
  * triggered by user actions
  */
 const socketMiddleware = (
-  socket: SocketIOClient.Socket,
+  socket: Socket,
   state: State,
   action: ActionTypes
 ): void => {

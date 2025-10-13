@@ -1,4 +1,5 @@
 import React, { useEffect, useReducer } from 'react'
+import { Socket } from 'socket.io-client'
 import initializeState from './initialize'
 import { DispatchContext, StateContext } from '../../contexts'
 import InputManager from '../inputs'
@@ -16,7 +17,7 @@ import './styles.scss'
 
 interface AppProps {
   initialState: State,
-  socket: SocketIOClient.Socket,
+  socket: Socket,
 }
 
 /**

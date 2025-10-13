@@ -2,22 +2,38 @@ import React from 'react'
 import { act, fireEvent, render } from '@testing-library/react'
 import App from './app/index'
 import { initializeState } from '../reducers'
+import { Socket } from 'socket.io-client'
 
-const mockSocket = () => {
-  const callbacks = {}
+const mockSocket = (): Socket & { trigger: (eventName: string, data: any) => void, __emitMock: jest.Mock } => {
+  const callbacks: Record<string, Array<(data: any) => void>> = {}
   const mockEmit = jest.fn()
-  return {
-    on: (eventName, callback) => {
-      if (!callbacks[eventName]) {
-        callbacks[eventName] = []
-      }
-      callbacks[eventName].push(callback)
+  const sock: Partial<Socket> & { trigger?: (ev: string, data: any) => void, __emitMock?: jest.Mock } = {
+    io: {} as any,
+    id: 'mock-socket',
+    connected: true,
+    disconnected: false,
+    open() { return sock as Socket },
+    connect() { return sock as Socket },
+    send(..._args: any[]) { return sock as Socket },
+    emit(event: string, ...args: any[]) { mockEmit(event, ...args); return sock as Socket },
+    close() { return sock as Socket },
+    disconnect() { return sock as Socket },
+    compress(_v: boolean) { return sock as Socket },
+    on(event: string, callback: (...a: any[]) => void) {
+      if (!callbacks[event]) callbacks[event] = []
+      callbacks[event].push((data: any) => callback(data))
+      return sock as Socket
     },
-    trigger: (eventName, data) => {
-      (callbacks[eventName] || []).forEach((callback) => { callback(data) })
+    once(event: string, callback: (...a: any[]) => void) {
+      const wrapper = (data: any) => { callback(data); sock.off && sock.off(event, wrapper) }
+      return (sock.on as any)(event, wrapper)
     },
-    emit: mockEmit,
+    removeAllListeners() { Object.keys(callbacks).forEach((k) => delete callbacks[k]); return sock as Socket },
+    hasListeners(event: string) { return !!(callbacks[event] && callbacks[event].length) },
   }
+  sock.trigger = (event: string, data: any) => { ;(callbacks[event] || []).slice().forEach((cb) => cb(data)) }
+  sock.__emitMock = mockEmit
+  return sock as Socket & { trigger: (eventName: string, data: any) => void, __emitMock: jest.Mock }
 }
 
 const socket = mockSocket()

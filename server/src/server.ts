@@ -108,7 +108,9 @@ async function main(config: ServerConfig): Promise<void> {
   // Create HTTP server w/ static file serving, socket.io bindings & basic auth
   const server = express()
   const httpServer = new http.Server(server)
-  const io = socketio(httpServer)
+  // socket.io v4 uses a Server class; instantiate it and cast to the
+  // legacy SocketIO types used across the codebase so TypeScript still compiles.
+  const io = new (socketio as any).Server(httpServer) as unknown as SocketIO.Server
   const inputs = new InputRegistry()
   if (config.basicAuth) {
     if (config.basicAuth.users && config.basicAuth.realm) {

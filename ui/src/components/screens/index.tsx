@@ -1,5 +1,4 @@
-import React, { Dispatch, useContext, useEffect, useMemo, useState } from 'react'
-import { DebounceInput } from 'react-debounce-input'
+import React, { Dispatch, useContext, useEffect, useMemo, useState, ChangeEvent, useRef } from 'react'
 
 import { DispatchContext, StateContext } from '../../contexts'
 import { ActionTypes, State } from '../../reducers/types'
@@ -7,6 +6,34 @@ import { MessageActions, MessageState } from '../../reducers/messages/types'
 import { ScreenActions, Screen as ScreenType, ScreenState } from '../../reducers/screens/types'
 
 import './styles.scss'
+
+// Small local DebounceInput replacement to avoid external dependency.
+interface LocalDebounceProps {
+  minLength?: number
+  debounceTimeout?: number
+  placeholder?: string
+  onChange?: (e: ChangeEvent<HTMLInputElement>) => void
+}
+
+const DebounceInput: React.FC<LocalDebounceProps> = ({
+  minLength = 0,
+  debounceTimeout = 300,
+  placeholder = '',
+  onChange = () => {},
+}) => {
+  const timer = useRef<number | null>(null)
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    if (val.length < (minLength || 0)) {
+      return onChange(e)
+    }
+    if (timer.current) window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => onChange(e), debounceTimeout)
+  }
+  return (
+    <input placeholder={placeholder} onChange={handleChange} />
+  )
+}
 
 interface ScreenManagerProps {
   addScreen: () => void,
@@ -107,7 +134,7 @@ const Screen: React.FC<ScreenProps> = ({
             minLength={2}
             debounceTimeout={200}
             placeholder="Filter"
-            onChange={e => setMessageFilter(e.target.value)}
+            onChange={e => setMessageFilter((e.target as HTMLInputElement).value)}
           />
           <button onClick={() => clearMessages(screen.id)}>
             Clear

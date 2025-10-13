@@ -1,6 +1,6 @@
 {
     "messageServer": {
-      "host": "rhdev.rl.local",
+      "host": "localhost",
       "port": 6689
     },
     "inputs": [
@@ -8,7 +8,7 @@
         "source": "Hrafnkell-Local",
         "stream": "system-logs",
         "config": {
-          "path": "/home/hrafnkell/git/log.io/inputs/demo.log",
+          "path": "/home/hrafnkell/git/log.io/inputs/demo_*.log",
           "watcherOptions": {
             "ignored": "*.txt",
             "depth": 0
@@ -17,4 +17,5 @@
       }
     ]
   }
+  
   

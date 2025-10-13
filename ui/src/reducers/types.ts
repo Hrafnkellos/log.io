@@ -14,13 +14,14 @@ import {
   ScreenState,
   ScreenActionTypes,
 } from './screens/types'
+import { Socket } from 'socket.io-client'
 
 export type State = {
   bindings: BindingState,
   inputs: InputState,
   messages: MessageState,
   screens: ScreenState,
-  socket: SocketIOClient.Socket,
+  socket: Socket,
 }
 
 export type ActionTypes = BindingActionTypes | InputActionTypes | MessageActionTypes | ScreenActionTypes

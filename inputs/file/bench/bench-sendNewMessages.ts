@@ -3,7 +3,7 @@ import os from 'os'
 import path from 'path'
 import { Socket } from 'net'
 import { promisify } from 'util'
-import { sendNewMessagesWithMetrics, sendNewMessages } from '../src/input'
+import { sendNewMessages } from '../src/input'
 
 const writeFile = promisify(fs.writeFile)
 const appendFile = promisify(fs.appendFile)
@@ -29,7 +29,7 @@ async function bench() {
   const stream = 'bench'
   const source = 'bench-source'
 
-  const linesPerAppend = 1000
+  const linesPerAppend = 100
   const line = 'This is a sample log line for benchmarking purposes.'
 
   // Allow targeting a specific file for a live test via CLI or env var
@@ -45,25 +45,29 @@ async function bench() {
   const iterations = 10
   let totalMessages = 0
   let totalBytes = 0
+  // Global incremental id for every line written by this benchmark
+  let lineId = 0
   const start = process.hrtime.bigint()
 
   for (let i = 0; i < iterations; i += 1) {
-    const chunk = Array(linesPerAppend).fill(line).join('\r\n') + '\r\n'
-    // In live-target mode we append to the provided file, otherwise append to temp file
+    // Tag each line with a unique incremental ID.
+    const chunk = Array.from({ length: linesPerAppend }, () => `id=${++lineId}|${line}`).join('\r\n') + '\r\n'
+    // Append to the target file (live) or temp file (synthetic)
     await appendFile(filePath, chunk, { encoding: 'utf8' })
     const newSize = (await stat(filePath)).size
-    if (targetFile) {
-      // Live test: use the fast path (no metrics) to avoid extra overhead
-      await sendNewMessages(client as unknown as Socket, stream, source, filePath, newSize, oldSize)
-    } else {
+    if (!targetFile) {
       // Default synthetic bench: measure with metrics
-      await sendNewMessagesWithMetrics(client as unknown as Socket, stream, source, filePath, newSize, oldSize)
+      await sendNewMessages(client as unknown as Socket, stream, source, filePath, newSize, oldSize)
+      // accumulate from DummySocket
+      const writtenBytes = client.written.reduce((acc, b) => acc + b.length, 0)
+      totalBytes = writtenBytes
+      totalMessages = client.written.length
+    } else {
+      // Live-target mode: only write to the file. Count bytes/messages based on what we appended.
+      totalMessages += linesPerAppend
+      totalBytes += Buffer.byteLength(chunk, 'utf8')
     }
     oldSize = newSize
-    // accumulate
-    const writtenBytes = client.written.reduce((acc, b) => acc + b.length, 0)
-    totalBytes = writtenBytes
-    totalMessages = client.written.length
   }
 
   const durationNs = Number(process.hrtime.bigint() - start)

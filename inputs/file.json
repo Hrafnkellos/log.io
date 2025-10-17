@@ -1,14 +1,14 @@
 {
     "messageServer": {
-      "host": "localhost",
-      "port": 6689
+      "host": "127.0.0.1",
+      "port": 6686
     },
     "inputs": [
       {
         "source": "Hrafnkell-Local",
         "stream": "system-logs",
         "config": {
-          "path": "/home/hrafnkell/git/log.io/inputs/demo_*.log",
+          "path": "/logs/demo_*.log",
           "watcherOptions": {
             "ignored": "*.txt",
             "depth": 0

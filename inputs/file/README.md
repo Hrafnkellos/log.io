@@ -132,8 +132,10 @@ Short command (mount the repository `inputs/file.json` into the container):
 ```sh
 # from `inputs/file` directory
 docker run --rm -it \
+    --add-host host.docker.internal:host-gateway \
   -v "$(pwd)/../file.json:/config/file.json:ro" \
   -e LOGIO_FILE_INPUT_CONFIG_PATH=/config/file.json \
+    -v $(pwd)/..:/logs:ro \
   logio-file-input:local
 ```
 
@@ -142,8 +144,10 @@ Run detached (background) and view logs:
 ```sh
 # run detached and name the container
 docker run -d --name logio-file-input \
+    --add-host host.docker.internal:host-gateway \
   -v "$(pwd)/../file.json:/config/file.json:ro" \
   -e LOGIO_FILE_INPUT_CONFIG_PATH=/config/file.json \
+  -v $(pwd)/..:/logs:ro \
   logio-file-input:local
 
 # view logs

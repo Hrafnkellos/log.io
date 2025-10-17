@@ -29,7 +29,7 @@ async function bench() {
   const stream = 'bench'
   const source = 'bench-source'
 
-  const linesPerAppend = 100
+  const linesPerAppend = 1
   const line = 'This is a sample log line for benchmarking purposes.'
 
   // Allow targeting a specific file for a live test via CLI or env var
@@ -42,7 +42,7 @@ async function bench() {
   const filePath = targetFile || (await makeTempFile(''))
   let oldSize = 0
 
-  const iterations = 10
+  const iterations = 1000
   let totalMessages = 0
   let totalBytes = 0
   // Global incremental id for every line written by this benchmark
@@ -51,9 +51,16 @@ async function bench() {
 
   for (let i = 0; i < iterations; i += 1) {
     // Tag each line with a unique incremental ID.
-    const chunk = Array.from({ length: linesPerAppend }, () => `id=${++lineId}|${line}`).join('\r\n') + '\r\n'
+    const chunk = Array.from({ 
+      length: linesPerAppend
+    }, () => `id=${++lineId}|${line}`).join('\r\n') + '\r\n'
     // Append to the target file (live) or temp file (synthetic)
     await appendFile(filePath, chunk, { encoding: 'utf8' })
+    // Every 100 iterations, wait 1 second
+    if (i > 0 && i % 100 === 0) {
+      console.log("⏳ Waiting 1 second...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
     const newSize = (await stat(filePath)).size
     if (!targetFile) {
       // Default synthetic bench: measure with metrics
